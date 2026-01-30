@@ -1,3 +1,6 @@
+# caserun folder
+case_run/
+
 # Object files
 *.lo
 *.o
