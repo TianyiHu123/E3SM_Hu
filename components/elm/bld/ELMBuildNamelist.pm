@@ -1057,9 +1057,10 @@ sub setup_cmdl_bgc {
       }
       $nl_flags->{$var} = $nl->get_value($var);
     }
-    if ($var eq "use_vertsoilc") {
-      $nl_flags->{$var} = ".true.";
-    }
+    # comment out by Tianyi to turn off vertsoil
+    #if ($var eq "use_vertsoilc") {
+    #  $nl_flags->{$var} = ".true.";
+    #}
     if ($var eq "use_snicar_ad") {
       $nl_flags->{$var} = ".true.";
     }
