@@ -1,6 +1,7 @@
 # caserun folder
 case_run/
-
+# spinup check
+components/elm/tools/ncl_scripts/*.png
 # Object files
 *.lo
 *.o
