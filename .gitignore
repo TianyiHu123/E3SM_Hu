@@ -2,6 +2,9 @@
 case_run/
 # spinup check
 components/elm/tools/ncl_scripts/*.png
+components/elm/tools/ncl_scripts/.ipynb_checkpoints/
+# PTCLM
+components/elm/tools/PTCLM/PTCLM_sitedata/lnd/*
 # Object files
 *.lo
 *.o
