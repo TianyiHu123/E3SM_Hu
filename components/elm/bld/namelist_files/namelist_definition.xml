@@ -1794,6 +1794,25 @@ Use original CLM4 soil hydraulic properties
 (deprecated -- will be removed)
 </entry>
 
+<!-- Tianyi Hu added for scalar                                           -->
+<entry id="hksat_sf" type="real" category="elm_physics"
+       group="elm_soilstate_inparm" valid_values="" >
+scale factor for hydraulic parameter
+</entry>
+<entry id="sucsat_sf" type="real" category="elm_physics"
+       group="elm_soilstate_inparm" valid_values="" >
+scale factor for hydraulic parameter
+</entry>
+<entry id="watsat_sf" type="real" category="elm_physics"
+       group="elm_soilstate_inparm" valid_values="" >
+scale factor for hydraulic parameter
+</entry>
+<entry id="bsw_sf" type="real" category="elm_physics"
+       group="elm_soilstate_inparm" valid_values="" >
+scale factor for hydraulic parameter
+</entry>
+<!-- Tianyi Hu added for scalar                                           -->
+
 <!-- ========================================================================================  -->
 <!-- namelist elements associated with the CH4 Model                                           -->
 <!-- ========================================================================================  -->
