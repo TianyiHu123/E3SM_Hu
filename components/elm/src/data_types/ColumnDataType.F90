@@ -23,7 +23,7 @@ module ColumnDataType
   use elm_varctl      , only : use_fates, use_fates_planthydro, create_glacier_mec_landunit
   use elm_varctl      , only : use_hydrstress, use_crop
   use elm_varctl      , only : bound_h2osoi, use_cn, iulog, use_vertsoilc, spinup_state
-  use elm_varctl      , only : ero_ccycle
+  use elm_varctl      , only : ero_ccycledecomp_cascade_con
   use elm_varctl      , only : use_elm_interface, use_pflotran, pf_cmode
   use elm_varctl      , only : hist_wrtch4diag, use_century_decomp
   use elm_varctl      , only : get_carbontag, override_bgc_restart_mismatch_dump
