@@ -34,20 +34,27 @@ class HyperviscosityFunctorImpl
 {
   // TODO: don't pass nu_ratio1/2. Instead, do like in F90: compute them from
   //       nu, nu_div, and hv_scaling
+public:
   struct HyperviscosityData {
     HyperviscosityData(const int hypervis_subcycle_in, 
                        const int hypervis_subcycle_tom_in, 
                        const Real nu_ratio1_in, const Real nu_ratio2_in, const Real nu_top_in,
                        const Real nu_in, const Real nu_p_in, const Real nu_s_in,
-                       const Real hypervis_scaling_in)
+                       const Real hypervis_scaling_in, bool do_3d_turbulence_in,
+                       const double tom_sponge_start_in, const Real laplace_scaling_in = 0.0)
                       : hypervis_subcycle(hypervis_subcycle_in) 
                       , hypervis_subcycle_tom(hypervis_subcycle_tom_in)
                       , nu_ratio1(nu_ratio1_in), nu_ratio2(nu_ratio2_in)
                       , nu_top(nu_top_in), nu(nu_in), nu_p(nu_p_in), nu_s(nu_s_in)
-                      , consthv(hypervis_scaling_in == 0){}
+                      , consthv(hypervis_scaling_in == 0)
+                      , constsponge(laplace_scaling_in == 0)
+                      , do_3d_turbulence(do_3d_turbulence_in)
+                      , tom_sponge_start(tom_sponge_start_in) {}
 
     const int   hypervis_subcycle;
     const int   hypervis_subcycle_tom;
+
+    bool do_3d_turbulence;
 
     Real  nu_ratio1;
     Real  nu_ratio2;
@@ -65,7 +72,11 @@ class HyperviscosityFunctorImpl
     Real        eta_ave_w;
 
     bool consthv;
+    bool constsponge;
+    double tom_sponge_start;
   };//hyperviscosityData
+
+  // tom_sponge_start is now in HyperviscosityData
 
   struct Buffers {
     ExecViewManaged<Scalar * [NP][NP][NUM_LEV]>    dptens;
@@ -73,6 +84,8 @@ class HyperviscosityFunctorImpl
     ExecViewManaged<Scalar * [NP][NP][NUM_LEV]>    wtens;
     ExecViewManaged<Scalar * [NP][NP][NUM_LEV]>    phitens;
     ExecViewManaged<Scalar * [2][NP][NP][NUM_LEV]> vtens;
+    ExecViewManaged<Scalar * [NP][NP][NUM_LEV_P]>  turb_diff_heat_i;
+    ExecViewManaged<Scalar * [NP][NP][NUM_LEV_P]>  turb_diff_mom_i;
   };//buffers
 
 public:
@@ -84,7 +97,10 @@ public:
   struct TagApplyInvMass {};
   struct TagHyperPreExchange {};
   struct TagNutopUpdateStates {};
-  struct TagNutopLaplace {};
+  struct TagNutopLaplaceConst {};
+  struct TagNutopLaplaceTensor {};
+  struct TagSGSTurbUpdateStates {};
+  struct TagSGSTurbLaplace {};
 
   HyperviscosityFunctorImpl (const SimulationParams&     params,
                              const ElementsGeometry&     geometry,
@@ -185,10 +201,20 @@ public:
 
   // Laplace for nu_top
   KOKKOS_INLINE_FUNCTION
-  void operator()(const TagNutopLaplace&, const TeamMember& team) const;
+  void operator()(const TagNutopLaplaceConst&, const TeamMember& team) const;
+
+  KOKKOS_INLINE_FUNCTION
+  void operator()(const TagNutopLaplaceTensor&, const TeamMember& team) const;
 
   KOKKOS_INLINE_FUNCTION
   void operator()(const TagNutopUpdateStates&, const TeamMember& team) const;
+
+  // Laplace for SGS Horizontal Turbulence
+  KOKKOS_INLINE_FUNCTION
+  void operator()(const TagSGSTurbLaplace&, const TeamMember& team) const;
+
+  KOKKOS_INLINE_FUNCTION
+  void operator()(const TagSGSTurbUpdateStates&, const TeamMember& team) const;
 
   //second iter of laplace, const hv
   KOKKOS_INLINE_FUNCTION
@@ -404,12 +430,14 @@ protected:
   Kokkos::TeamPolicy<ExecSpace,TagFirstLaplaceHV>   m_policy_first_laplace;
   Kokkos::TeamPolicy<ExecSpace,TagHyperPreExchange> m_policy_pre_exchange;
 
-  Kokkos::TeamPolicy<ExecSpace,TagNutopLaplace>      m_policy_nutop_laplace;
   Kokkos::TeamPolicy<ExecSpace,TagNutopUpdateStates> m_policy_nutop_update_states;
+
+  Kokkos::TeamPolicy<ExecSpace,TagSGSTurbLaplace>      m_policy_sgsturb_laplace;
+  Kokkos::TeamPolicy<ExecSpace,TagSGSTurbUpdateStates> m_policy_sgsturb_update_states;
 
   TeamUtils<ExecSpace> m_tu; // If the policies only differ by tag, just need one tu
 
-  std::shared_ptr<BoundaryExchange> m_be, m_be_tom;
+  std::shared_ptr<BoundaryExchange> m_be, m_be_tom, m_be_sgs;
 
   ExecViewManaged<Scalar[NUM_LEV]> m_nu_scale_top;
   int m_nu_scale_top_ilev_pack_lim;

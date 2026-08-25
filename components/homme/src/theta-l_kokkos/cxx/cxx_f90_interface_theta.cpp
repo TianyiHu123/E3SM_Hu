@@ -42,12 +42,13 @@ void init_simulation_params_c (const int& remap_alg, const int& limiter_option, 
                                const int& time_step_type, const int& qsize, const int& state_frequency,
                                const Real& nu, const Real& nu_p, const Real& nu_q, const Real& nu_s, const Real& nu_div, const Real& nu_top,
                                const int& hypervis_order, const int& hypervis_subcycle, const int& hypervis_subcycle_tom,
-                               const double& hypervis_scaling, const double& dcmip16_mu,
+                               const double& hypervis_scaling, const double& laplace_scaling, const double& dcmip16_mu,
                                const int& ftype, const int& theta_adv_form, const int& prescribed_wind, const int& use_moisture, const int& disable_diagnostics,
                                const int& use_cpstar, const int& transport_alg, const int& theta_hydrostatic_mode, const char** test_case,
                                const int& dt_remap_factor, const int& dt_tracer_factor,
                                const double& scale_factor, const double& laplacian_rigid_factor, const int& nsplit, const int& pgrad_correction,
-                               const double& dp3d_thresh, const double& vtheta_thresh, const int& internal_diagnostics_level)
+                               const double& dp3d_thresh, const double& vtheta_thresh, const int& internal_diagnostics_level,
+                               const int& do_3d_turbulence, const Real& tom_sponge_start)
 {
 
   // Check that the simulation options are supported. This helps us in the future, since we
@@ -69,7 +70,7 @@ void init_simulation_params_c (const int& remap_alg, const int& limiter_option, 
   Errors::check_option("init_simulation_params_c","dp3d_thresh",dp3d_thresh,0.0,Errors::ComparisonOp::GT);
   Errors::check_option("init_simulation_params_c","vtheta_thresh",vtheta_thresh,0.0,Errors::ComparisonOp::GT);
   Errors::check_option("init_simulation_params_c","nu_div",nu_div,0.0,Errors::ComparisonOp::GT);
-  Errors::check_option("init_simulation_params_c","theta_advection_form",theta_adv_form,{0,1});
+  Errors::check_option("init_simulation_params_c","theta_advection_form",theta_adv_form,{0,1,2});
 #ifndef SCREAM
   Errors::check_option("init_simulation_params_c","nsplit",nsplit,1,Errors::ComparisonOp::GE);
 #else
@@ -90,8 +91,10 @@ void init_simulation_params_c (const int& remap_alg, const int& limiter_option, 
 
   if (theta_adv_form==0) {
     params.theta_adv_form = AdvectionForm::Conservative;
-  } else {
+  } else if (theta_adv_form==1) {
     params.theta_adv_form = AdvectionForm::NonConservative;
+  } else if (theta_adv_form==2) {
+    params.theta_adv_form = AdvectionForm::Split;
   }
 
   params.limiter_option                = limiter_option;
@@ -112,9 +115,9 @@ void init_simulation_params_c (const int& remap_alg, const int& limiter_option, 
   params.hypervis_subcycle             = hypervis_subcycle;
   params.hypervis_subcycle_tom         = hypervis_subcycle_tom;
   params.hypervis_scaling              = hypervis_scaling;
+  params.laplace_scaling               = laplace_scaling;
   params.disable_diagnostics           = (bool)disable_diagnostics;
   params.use_moisture                  = (bool)use_moisture;
-  params.moisture = params.use_moisture ? MoistDry::MOIST : MoistDry::DRY; //todo-repo-unification
   params.use_cpstar                    = (bool)use_cpstar;
   params.transport_alg                 = transport_alg;
   params.theta_hydrostatic_mode        = (bool)theta_hydrostatic_mode;
@@ -126,6 +129,8 @@ void init_simulation_params_c (const int& remap_alg, const int& limiter_option, 
   params.dp3d_thresh                   = dp3d_thresh;
   params.vtheta_thresh                 = vtheta_thresh;
   params.internal_diagnostics_level    = internal_diagnostics_level;
+  params.do_3d_turbulence              = (bool)do_3d_turbulence;
+  params.tom_sponge_start              = tom_sponge_start;
 
   if (time_step_type==5) {
     //5 stage, 3rd order, explicit
@@ -280,8 +285,7 @@ void init_elements_c (const int& num_elems)
   Elements& e = c.create<Elements> ();
   const SimulationParams& params = c.get<SimulationParams>();
 
-  const bool consthv = (params.hypervis_scaling==0.0);
-  e.init (num_elems, consthv, /* alloc_gradphis = */ true,
+  e.init (num_elems, /* alloc_gradphis = */ true,
           params.scale_factor, params.laplacian_rigid_factor,
           /* alloc_sphere_coords = */ params.transport_alg > 0);
 
@@ -358,7 +362,13 @@ void init_functors_c (const int& allocate_buffer)
 #ifdef HOMME_ENABLE_COMPOSE
   else                           c.create_if_not_there<ComposeTransport>();
 #endif
-  auto& hvf     = c.create_if_not_there<HyperviscosityFunctor>();
+  // Pass (num_elems, params) so that, like caar above, this uses the
+  // lazy-construction path (is_setup=false), forcing the setup_needed()/
+  // setup() call below to actually run. That setup() call is what copies
+  // nu_scale_top/nu_scale_top_ilev_pack_lim from the Fortran-initialized
+  // ref states (needed when tom_sponge_start>0); the no-args constructor
+  // sets is_setup=true immediately, silently skipping that copy.
+  auto& hvf     = c.create_if_not_there<HyperviscosityFunctor>(elems.num_elems(), params);
   auto& ff      = c.create_if_not_there<ForcingFunctor>();
   auto& diag    = c.create_if_not_there<Diagnostics> (elems.num_elems(),tracers.num_tracers(),
                                                       params.theta_hydrostatic_mode);
@@ -458,15 +468,37 @@ void init_elements_2d_c (const int& ie,
                          CF90Ptr& spheremp, CF90Ptr& rspheremp,
                          CF90Ptr& metdet, CF90Ptr& metinv,
                          CF90Ptr &tensorvisc, CF90Ptr &vec_sph2cart,
-                         double* sphere_cart_vec, double* sphere_latlon_vec)
+                         double* sphere_cart_vec, double* sphere_latlon_vec,
+                         CF90Ptr &tensorvisc2)
 {
   auto& c = Context::singleton();
   Elements& e = c.get<Elements> ();
-  const SimulationParams& params = c.get<SimulationParams>();
 
-  const bool consthv = (params.hypervis_scaling==0.0);
   e.m_geometry.set_elem_data(ie,D,Dinv,fcor,spheremp,rspheremp,metdet,metinv,tensorvisc,
-                             vec_sph2cart,consthv,sphere_cart_vec,sphere_latlon_vec);
+                             vec_sph2cart,sphere_cart_vec,sphere_latlon_vec,
+                             tensorvisc2);
+}
+
+// Copies just tensorVisc from f90 arrays into the C++ view. Separate from
+// init_elements_2d_c() so that it can be called again, after dss_hvtensor
+// has updated tensorVisc, without re-copying the other (constant) geometry
+// fields.
+void init_tensorvisc_c (const int& ie, CF90Ptr& tensorvisc)
+{
+  auto& c = Context::singleton();
+  Elements& e = c.get<Elements> ();
+
+  e.m_geometry.set_tensorvisc(ie,tensorvisc);
+}
+
+// Same as init_tensorvisc_c(), but for tensorVisc_2 (the sponge-layer
+// tensor coefficient), which is likewise recomputed by dss_hvtensor.
+void init_tensorvisc2_c (const int& ie, CF90Ptr& tensorvisc2)
+{
+  auto& c = Context::singleton();
+  Elements& e = c.get<Elements> ();
+
+  e.m_geometry.set_tensorvisc2(ie,tensorvisc2);
 }
 
 void init_geopotential_c (const int& ie,
@@ -533,7 +565,8 @@ void init_elements_states_c (CF90Ptr& elem_state_v_ptr,       CF90Ptr& elem_stat
 
 void init_reference_states_c (CF90Ptr& elem_theta_ref_ptr,
                               CF90Ptr& elem_dp_ref_ptr,
-                              CF90Ptr& elem_phi_ref_ptr)
+                              CF90Ptr& elem_phi_ref_ptr,
+                              CF90Ptr& nu_scale_top_ptr)
 {
   auto& state = Context::singleton().get<ElementsState> ();
   auto& ref_states = state.m_ref_states;
@@ -548,6 +581,22 @@ void init_reference_states_c (CF90Ptr& elem_theta_ref_ptr,
   sync_to_device(theta_ref, ref_states.theta_ref);
   sync_to_device(dp_ref,    ref_states.dp_ref);
   sync_to_device(phi_ref,   ref_states.phi_i_ref);
+
+  // Unpack nu_scale_top from Fortran 1D array (nlev reals) into packed Scalar[NUM_LEV] view
+  const Real* nu_scale_top_f = static_cast<const Real*>(nu_scale_top_ptr);
+  auto h_nu_scale_top = Kokkos::create_mirror_view(ref_states.nu_scale_top);
+  ref_states.nu_scale_top_ilev_pack_lim = 0;
+  for (int phys_lev = 0; phys_lev < NUM_LEV * VECTOR_SIZE; ++phys_lev) {
+    const int ilev = phys_lev / VECTOR_SIZE;
+    const int ivec = phys_lev % VECTOR_SIZE;
+    const Real val = (phys_lev < NUM_PHYSICAL_LEV) ? nu_scale_top_f[phys_lev] : 0.0;
+    h_nu_scale_top(ilev)[ivec] = val;
+    if (val != 0.0) ref_states.nu_scale_top_ilev_pack_lim = phys_lev + 1;
+  }
+  // Convert last nonzero physical level index to pack index
+  ref_states.nu_scale_top_ilev_pack_lim =
+      (ref_states.nu_scale_top_ilev_pack_lim + VECTOR_SIZE - 1) / VECTOR_SIZE;
+  Kokkos::deep_copy(ref_states.nu_scale_top, h_nu_scale_top);
 }
 
 void init_diagnostics_c (F90Ptr& elem_state_q_ptr, F90Ptr& elem_accum_qvar_ptr,  F90Ptr& elem_accum_qmass_ptr,
