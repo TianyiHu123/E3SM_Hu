@@ -5627,6 +5627,72 @@
     </environment_variables>
   </machine>
 
+  <machine MACH="ua-puma9">
+    <DESC>UA HPC Puma, Rocky Linux 9, GNU 13.2, Open MPI 5.0.5. Standard nodes have 94 schedulable CPUs (CPUTot 96).</DESC>
+    <NODENAME_REGEX>.*\.puma\.hpc\.arizona\.edu</NODENAME_REGEX>
+    <OS>LINUX</OS>
+    <COMPILERS>gnu</COMPILERS>
+    <MPILIBS>openmpi</MPILIBS>
+    <PROJECT>chopinsong</PROJECT>
+    <CIME_OUTPUT_ROOT>/xdisk/chopinsong/tianyihu/E3SM_out/port_uapuma</CIME_OUTPUT_ROOT>
+    <DIN_LOC_ROOT>/xdisk/chopinsong/tianyihu/e3sm_inputdata</DIN_LOC_ROOT>
+    <DIN_LOC_ROOT_CLMFORC>/xdisk/chopinsong/tianyihu/e3sm_inputdata/atm/datm7</DIN_LOC_ROOT_CLMFORC>
+    <DOUT_S_ROOT>$CIME_OUTPUT_ROOT/archive/$CASE</DOUT_S_ROOT>
+    <BASELINE_ROOT>$CIME_OUTPUT_ROOT/baselines/$COMPILER</BASELINE_ROOT>
+    <GMAKE>make</GMAKE>
+    <GMAKE_J>8</GMAKE_J>
+    <BATCH_SYSTEM>puma_slurm</BATCH_SYSTEM>
+    <SUPPORTED_BY>tianyihu</SUPPORTED_BY>
+    <MAX_TASKS_PER_NODE>94</MAX_TASKS_PER_NODE>
+    <MAX_MPITASKS_PER_NODE>94</MAX_MPITASKS_PER_NODE>
+    <PROJECT_REQUIRED>TRUE</PROJECT_REQUIRED>
+    <mpirun mpilib="default">
+      <executable>mpirun</executable>
+      <arguments>
+        <arg name="num_tasks">-np {{ total_tasks }}</arg>
+      </arguments>
+    </mpirun>
+    <module_system type="module">
+      <init_path lang="perl">/opt/ohpc/admin/lmod/lmod/init/perl</init_path>
+      <init_path lang="python">/opt/ohpc/admin/lmod/lmod/init/env_modules_python.py</init_path>
+      <init_path lang="csh">/opt/ohpc/admin/lmod/lmod/init/csh</init_path>
+      <init_path lang="sh">/opt/ohpc/admin/lmod/lmod/init/sh</init_path>
+      <cmd_path lang="perl">/opt/ohpc/admin/lmod/lmod/libexec/lmod perl</cmd_path>
+      <cmd_path lang="python">/opt/ohpc/admin/lmod/lmod/libexec/lmod python</cmd_path>
+      <cmd_path lang="sh">module</cmd_path>
+      <cmd_path lang="csh">module</cmd_path>
+      <modules>
+        <command name="load">gnu13/13.2.0</command>
+        <command name="load">openmpi5/5.0.5</command>
+        <command name="load">phdf5/1.14.0</command>
+        <command name="load">netcdf/4.9.2</command>
+        <command name="load">netcdf-fortran/4.6.1</command>
+        <command name="load">pnetcdf/1.12.3</command>
+        <command name="load">openblas/0.3.21</command>
+        <command name="load">scalapack/2.2.0</command>
+        <command name="load">cmake/3.28.3</command>
+      </modules>
+    </module_system>
+    <RUNDIR>$CIME_OUTPUT_ROOT/$CASE/run</RUNDIR>
+    <EXEROOT>$CIME_OUTPUT_ROOT/$CASE/bld</EXEROOT>
+    <environment_variables>
+      <env name="NETCDF_C_PATH">/opt/ohpc/pub/libs/gnu13/openmpi5/netcdf/4.9.2</env>
+      <env name="NETCDF_FORTRAN_PATH">/opt/ohpc/pub/libs/gnu13/openmpi5/netcdf-fortran/4.6.1</env>
+      <env name="NETCDF_PATH">/opt/ohpc/pub/libs/gnu13/openmpi5/netcdf/4.9.2</env>
+      <env name="PNETCDF_PATH">/opt/ohpc/pub/libs/gnu13/openmpi5/pnetcdf/1.12.3</env>
+      <env name="PNETCDF">/opt/ohpc/pub/libs/gnu13/openmpi5/pnetcdf/1.12.3</env>
+      <env name="HDF5_DIR">/opt/ohpc/pub/libs/gnu13/openmpi5/hdf5/1.14.0</env>
+      <env name="HDF5">/opt/ohpc/pub/libs/gnu13/openmpi5/hdf5/1.14.0</env>
+      <env name="BLA_VENDOR">OpenBLAS</env>
+      <env name="BLAS_ROOT">/opt/ohpc/pub/libs/gnu13/openblas/0.3.21</env>
+      <env name="LAPACK_ROOT">/opt/ohpc/pub/libs/gnu13/openblas/0.3.21</env>
+      <env name="OMP_STACKSIZE">256M</env>
+    </environment_variables>
+    <resource_limits>
+      <resource name="RLIMIT_STACK">-1</resource>
+    </resource_limits>
+  </machine>
+
   <default_run_suffix>
     <default_run_exe>${EXEROOT}/e3sm.exe </default_run_exe>
     <default_run_misc_suffix> &gt;&gt; e3sm.log.$LID 2&gt;&amp;1 </default_run_misc_suffix>

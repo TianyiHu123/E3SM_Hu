@@ -1008,4 +1008,36 @@
     </queues>
   </batch_system>
 
+  <batch_system type="puma_slurm">
+    <batch_query per_job_arg="-j">squeue</batch_query>
+    <batch_submit>sbatch</batch_submit>
+    <batch_cancel>scancel</batch_cancel>
+    <batch_directive>#SBATCH</batch_directive>
+    <jobid_pattern>(\d+)$</jobid_pattern>
+    <depend_string>--dependency=afterok:jobid</depend_string>
+    <depend_allow_string>--dependency=afterany:jobid</depend_allow_string>
+    <depend_separator>:</depend_separator>
+    <walltime_format>%H:%M:%S</walltime_format>
+    <submit_args>
+      <arg flag="--time" name="$JOB_WALLCLOCK_TIME"/>
+      <arg flag="-p" name="$JOB_QUEUE"/>
+      <arg flag="--account" name="$PROJECT"/>
+    </submit_args>
+    <directives>
+      <directive>--job-name={{ job_id }}</directive>
+      <directive>--nodes={{ num_nodes }}</directive>
+      <directive>--ntasks-per-node={{ tasks_per_node }}</directive>
+      <directive>--cpus-per-task={{ thread_count }}</directive>
+      <directive>--output={{ job_id }}.%j</directive>
+    </directives>
+  </batch_system>
+
+  <batch_system MACH="ua-puma9" type="puma_slurm">
+    <queues>
+      <queue walltimemax="48:00:00" walltimedef="02:00:00" nodemin="1" default="true">standard</queue>
+      <queue walltimemax="48:00:00" walltimedef="02:00:00" nodemin="1">windfall</queue>
+      <queue walltimemax="48:00:00" walltimedef="02:00:00" nodemin="1">high_priority</queue>
+    </queues>
+  </batch_system>
+
 </config_batch>
