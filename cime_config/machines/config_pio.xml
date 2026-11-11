@@ -27,6 +27,10 @@
   <entry id="PIO_STRIDE">
     <values>
       <value>$MAX_MPITASKS_PER_NODE</value>
+      <!-- ua-puma9: MAX_MPITASKS_PER_NODE=94. Stride=94 yields 1-2 PNetCDF
+           writers on a full node and stalled restart I/O (~2.5 KB/s). Stride=8
+           gives ~ntasks/8 writers (11 on 94 ranks) without using all ranks. -->
+      <value mach="ua-puma9">8</value>
     </values>
   </entry>
 
