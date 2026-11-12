@@ -7,6 +7,11 @@
     <address>https://web.lcrc.anl.gov/public/e3sm/inputdata/</address>
   </server>
   <server>
+    <comment>UCAR HTTPS wget fallback. ANL 404s some GSWP3 monthly paths; many clusters have wget but no svn client.</comment>
+    <protocol>wget</protocol>
+    <address>https://svn-ccsm-inputdata.cgd.ucar.edu/trunk/inputdata/</address>
+  </server>
+  <server>
     <protocol>svn</protocol>
     <address>https://svn-ccsm-inputdata.cgd.ucar.edu/trunk/inputdata</address>
   </server>
